@@ -1,5 +1,5 @@
-from PyQt5.QtGui import QPen, QColor
-from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsItem, QGraphicsLineItem
+from PyQt5.QtGui import QPen, QColor, QFont
+from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsItem, QGraphicsTextItem, QGraphicsLineItem
 from PyQt5.QtCore import Qt, QPointF, QLineF
 
 
@@ -16,7 +16,7 @@ class Block(QGraphicsRectItem):
             QGraphicsItem.ItemSendsGeometryChanges
         )
         self.block_type = block_type
-        self.properties = properties or {}
+        self.properties = properties or {}  # Editable properties
         self.bdsim_instance = None
 
         # Assign a unique name
@@ -26,10 +26,37 @@ class Block(QGraphicsRectItem):
             Block.instance_counter[block_type] += 1
         self.name = f"{block_type} {Block.instance_counter[block_type]}"
 
+        # Display the block name
+        self.name_label = QGraphicsTextItem(self.name, self)
+        self.name_label.setDefaultTextColor(Qt.white)
+        self.name_label.setFont(QFont("Arial", 10))
+        self.name_label.setPos(10, -20)  # Position above the block
+
         # Add ports dynamically based on block type
         self.input_ports = []
         self.output_ports = []
         self.add_ports()
+
+    def create_bdsim_instance(self, bdsim_model):
+        """Create a bdsim instance for this block."""
+        if self.block_type == "STEP":
+            self.bdsim_instance = bdsim_model.STEP(
+                T=float(self.properties.get("Start Time", 0)),
+                A=float(self.properties.get("Amplitude", 1)),
+                name=self.name,
+            )
+        elif self.block_type == "GAIN":
+            self.bdsim_instance = bdsim_model.GAIN(
+                K=float(self.properties.get("Gain", 1)),
+                name=self.name,
+            )
+        elif self.block_type == "SUM":
+            self.bdsim_instance = bdsim_model.SUM(
+                signs=self.properties.get("Signs", "+-"),
+                name=self.name,
+            )
+        elif self.block_type == "SCOPE":
+            self.bdsim_instance = bdsim_model.SCOPE(name=self.name)
 
     def add_ports(self):
         """Add ports to the block based on its type."""
@@ -38,12 +65,16 @@ class Block(QGraphicsRectItem):
         # Define ports based on the block type
         if self.block_type == "STEP":
             num_inputs, num_outputs = 0, 1
+            self.properties = {"Amplitude": 1, "Start Time": 0}
         elif self.block_type == "GAIN":
             num_inputs, num_outputs = 1, 1
+            self.properties = {"Gain": 1}
         elif self.block_type == "SUM":
             num_inputs, num_outputs = 2, 1
+            self.properties = {"Inputs": "+-"}
         elif self.block_type == "SCOPE":
             num_inputs, num_outputs = 1, 0
+            self.properties = {"Style": "Line"}
         else:
             num_inputs, num_outputs = 0, 0  # Default for unknown types
 
@@ -59,22 +90,6 @@ class Block(QGraphicsRectItem):
             port.setPos(self.rect().right(), self.rect().top() + i * port_spacing + 10)
             self.output_ports.append(port)
 
-    def update_ports(self):
-        """Update port positions when the block is moved."""
-        for i, port in enumerate(self.input_ports):
-            port.setPos(self.rect().left() - 10, self.rect().top() + i * 20 + 10)
-        for i, port in enumerate(self.output_ports):
-            port.setPos(self.rect().right(), self.rect().top() + i * 20 + 10)
-
-    def itemChange(self, change, value):
-        """Handle block movement and update port positions."""
-        if change == QGraphicsItem.ItemPositionChange and self.scene():
-            self.update_ports()
-            for wire in self.scene().items():
-                if isinstance(wire, Wire):
-                    wire.update_position()
-        return super().itemChange(change, value)
-
 
 class Port(QGraphicsEllipseItem):
     """A port on a block."""
@@ -83,31 +98,3 @@ class Port(QGraphicsEllipseItem):
         self.setBrush(Qt.darkGray)
         self.port_type = port_type  # Either "input" or "output"
         self.setZValue(1)  # Ensure ports are always on top
-
-
-class Wire(QGraphicsLineItem):
-    """Represents a wire connecting two ports."""
-    def __init__(self, start_port, end_port):
-        super().__init__()
-        self.start_port = start_port
-        self.end_port = end_port
-        self.setPen(QPen(QColor("black"), 2))
-        self.update_position()
-
-    def update_position(self):
-        """Update the wire's position."""
-        start = self.start_port.scenePos() + QPointF(self.start_port.rect().width() / 2, self.start_port.rect().height() / 2)
-        end = self.end_port.scenePos() + QPointF(self.end_port.rect().width() / 2, self.end_port.rect().height() / 2)
-        self.setLine(QLineF(start, end))
-
-    def create_bdsim_connection(self, bdsim_model):
-        """Connect bdsim blocks via ports."""
-        start_block = self.start_port.parentItem()
-        end_block = self.end_port.parentItem()
-        if (
-            start_block.bdsim_instance
-            and end_block.bdsim_instance
-            and self.start_port.port_type == "output"
-            and self.end_port.port_type == "input"
-        ):
-            bdsim_model.connect(start_block.bdsim_instance, end_block.bdsim_instance)

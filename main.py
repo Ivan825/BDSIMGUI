@@ -113,6 +113,8 @@ class MainWindow(QMainWindow):
 
     def simulate(self):
         """Compile the current diagram into a bdsim model and simulate."""
+        from bdsim import BDSim
+
         sim = BDSim()
         bdsim_model = sim.blockdiagram()
 
@@ -131,14 +133,26 @@ class MainWindow(QMainWindow):
             bdsim_model.compile()
             results = sim.run(bdsim_model, 5)
 
-            # Plot results
+            # Ensure results contain a SCOPE block
             if "scope.0" in results["out"]:
                 scope_data = results["out"]["scope.0"]
                 self.plot_canvas.plot(scope_data.t, scope_data.y)
             else:
-                self.plot_canvas.plot([], [])  # No data to plot
+                print("No valid SCOPE block found in the diagram.")
+                self.show_error_message(
+                    "No valid SCOPE block found in the diagram. Add a SCOPE block and connect it properly.")
         except Exception as e:
             print(f"Simulation Error: {e}")
+            self.show_error_message(f"Simulation Error: {e}")
+
+    def show_error_message(self, message):
+        """Display an error message in a dialog box."""
+        from PyQt5.QtWidgets import QMessageBox
+        error_dialog = QMessageBox(self)
+        error_dialog.setIcon(QMessageBox.Critical)
+        error_dialog.setWindowTitle("Simulation Error")
+        error_dialog.setText(message)
+        error_dialog.exec_()
 
 
 if __name__ == "__main__":

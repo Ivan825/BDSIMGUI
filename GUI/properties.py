@@ -1,41 +1,50 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QFormLayout, QScrollArea
 
 
 class PropertiesEditor(QWidget):
-    """Widget for editing block properties."""
+    """Widget to display and edit block properties."""
+
     def __init__(self):
         super().__init__()
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
 
-        self.title_label = QLabel("Properties")
-        self.layout.addWidget(self.title_label)
+        # Add a scroll area for better usability
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_content = QWidget()
+        self.scroll_layout = QFormLayout()
+        self.scroll_content.setLayout(self.scroll_layout)
+        self.scroll_area.setWidget(self.scroll_content)
 
-        # Dynamically populated inputs
-        self.property_inputs = {}
+        self.layout.addWidget(self.scroll_area)
 
     def set_block(self, block):
-        """Set the block whose properties to edit."""
-        # Clear existing properties
-        for widget in self.property_inputs.values():
-            self.layout.removeWidget(widget)
-            widget.deleteLater()
+        """Set the properties of the selected block."""
+        # Clear the previous properties
+        for i in reversed(range(self.scroll_layout.count())):
+            widget = self.scroll_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
 
-        self.property_inputs.clear()
+        # Add properties for the selected block
+        block_label = QLabel(f"{block.name}")
+        self.scroll_layout.addRow(block_label)
 
-        # Populate new properties
-        if block and block.properties:
-            self.title_label.setText(block.name)
-            for prop_name, prop_value in block.properties.items():
-                label = QLabel(prop_name)
-                input_field = QLineEdit(str(prop_value))
-                input_field.editingFinished.connect(
-                    lambda pn=prop_name, field=input_field: self.update_property(block, pn, field)
-                )
-                self.layout.addWidget(label)
-                self.layout.addWidget(input_field)
-                self.property_inputs[prop_name] = input_field
+        for prop, value in block.properties.items():
+            label = QLabel(prop)
+            input_field = QLineEdit(str(value))
 
-    def update_property(self, block, prop_name, input_field):
+            # Use lambda with default argument to avoid reference issues
+            input_field.editingFinished.connect(
+                lambda p=prop, field=input_field: self.update_property(block, p, field.text())
+            )
+            self.scroll_layout.addRow(label, input_field)
+
+    def update_property(self, block, prop, value):
         """Update the property of the block."""
-        block.properties[prop_name] = input_field.text()
+        try:
+            # Convert value to its original type
+            block.properties[prop] = type(block.properties[prop])(value)
+        except ValueError:
+            block.properties[prop] = value
