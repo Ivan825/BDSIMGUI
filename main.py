@@ -1,12 +1,11 @@
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QWidget, QSplitter
-)
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QSplitter, QAction
 from PyQt5.QtCore import Qt
 from GUI.toolbar import Toolbar
 from GUI.canvas import DiagramCanvas
 from GUI.properties import PropertiesEditor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+
 
 class PlotCanvas(FigureCanvas):
     """A Matplotlib-based widget for plotting simulation results."""
@@ -25,6 +24,7 @@ class PlotCanvas(FigureCanvas):
         self.ax.legend()
         self.draw()
 
+
 class MainWindow(QMainWindow):
     """Main application window."""
     def __init__(self):
@@ -39,6 +39,11 @@ class MainWindow(QMainWindow):
         # Toolbar
         self.toolbar = Toolbar()
         self.addToolBar(self.toolbar)
+
+        # Add "Delete" button to the toolbar
+        delete_action = QAction("Delete", self)
+        delete_action.triggered.connect(self.delete_selected)
+        self.toolbar.addAction(delete_action)
 
         # Splitter for resizability
         self.splitter = QSplitter(Qt.Horizontal)
@@ -72,6 +77,12 @@ class MainWindow(QMainWindow):
         # Toolbar to access canvas and plot
         self.toolbar.set_canvas(self.canvas)
         self.toolbar.set_plot_canvas(self.plot_canvas)
+
+    def delete_selected(self):
+        """Delete all selected items (blocks, wires, or groups)."""
+        for item in self.canvas.scene.selectedItems():
+            self.canvas.scene.removeItem(item)
+
 
 if __name__ == "__main__":
     import sys
