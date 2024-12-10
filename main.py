@@ -1,10 +1,12 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QSplitter, QAction
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QVBoxLayout, QWidget, QSplitter, QToolBar, QComboBox, QLabel, QAction
+)
 from PyQt5.QtCore import Qt
-from GUI.toolbar import Toolbar
 from GUI.canvas import DiagramCanvas
 from GUI.properties import PropertiesEditor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from bdsim import BDSim
 
 
 class PlotCanvas(FigureCanvas):
@@ -27,6 +29,7 @@ class PlotCanvas(FigureCanvas):
 
 class MainWindow(QMainWindow):
     """Main application window."""
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("BDSim GUI")
@@ -37,51 +40,105 @@ class MainWindow(QMainWindow):
         self.layout = QVBoxLayout()
 
         # Toolbar
-        self.toolbar = Toolbar()
+        self.toolbar = QToolBar("Toolbar")
         self.addToolBar(self.toolbar)
 
-        # Add "Delete" button to the toolbar
-        delete_action = QAction("Delete", self)
+        # Block Type Selector
+        self.block_type_label = QLabel("Block Type:")
+        self.block_type_selector = QComboBox()
+        self.block_type_selector.addItems(["STEP", "GAIN", "SUM", "SCOPE"])
+        self.block_type_selector.currentTextChanged.connect(self.set_block_type)
+
+        self.toolbar.addWidget(self.block_type_label)
+        self.toolbar.addWidget(self.block_type_selector)
+
+        # Add "Add Block" Button
+        add_block_action = QAction("Add Block", self)
+        add_block_action.triggered.connect(self.add_block)
+        self.toolbar.addAction(add_block_action)
+
+        # Delete Button
+        delete_action = QAction("Delete Selected", self)
         delete_action.triggered.connect(self.delete_selected)
         self.toolbar.addAction(delete_action)
 
-        # Splitter for resizability
-        self.splitter = QSplitter(Qt.Horizontal)
-
-        # Diagram Canvas (on the left)
-        self.canvas = DiagramCanvas()
-        self.splitter.addWidget(self.canvas)
-
-        # Properties Editor + Plot Area (on the right)
-        self.right_panel = QWidget()
-        self.right_layout = QVBoxLayout()
+        # Simulate Button
+        simulate_action = QAction("Simulate", self)
+        simulate_action.triggered.connect(self.simulate)
+        self.toolbar.addAction(simulate_action)
 
         # Properties Editor
         self.properties_editor = PropertiesEditor()
+
+        # Diagram Canvas
+        self.canvas = DiagramCanvas(properties_editor=self.properties_editor)
+
+        # Plotting Canvas
+        self.plot_canvas = PlotCanvas()
+
+        # Layouts
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.addWidget(self.canvas)
+
+        # Right Panel (Properties + Plot)
+        self.right_panel = QWidget()
+        self.right_layout = QVBoxLayout()
         self.right_layout.addWidget(self.properties_editor)
-
-        # Plotting Area
-        self.plot_canvas = PlotCanvas(self, width=8, height=6)
         self.right_layout.addWidget(self.plot_canvas)
-
         self.right_panel.setLayout(self.right_layout)
+
         self.splitter.addWidget(self.right_panel)
+        self.splitter.setSizes([800, 400])  # Initial splitter sizes
 
-        # Add the splitter to the layout
         self.layout.addWidget(self.splitter)
-
-        # Set central layout
         self.central_widget.setLayout(self.layout)
         self.setCentralWidget(self.central_widget)
 
-        # Toolbar to access canvas and plot
-        self.toolbar.set_canvas(self.canvas)
-        self.toolbar.set_plot_canvas(self.plot_canvas)
+        # Set default block type
+        self.current_block_type = self.block_type_selector.currentText()
+
+    def set_block_type(self, block_type):
+        """Set the current block type from the dropdown menu."""
+        self.current_block_type = block_type
+
+    def add_block(self):
+        """Add a block of the selected type to the canvas."""
+        x, y = 100, 100  # Default position
+        self.canvas.add_block(self.current_block_type, x, y)
 
     def delete_selected(self):
         """Delete all selected items (blocks, wires, or groups)."""
         for item in self.canvas.scene.selectedItems():
             self.canvas.scene.removeItem(item)
+
+    def simulate(self):
+        """Compile the current diagram into a bdsim model and simulate."""
+        sim = BDSim()
+        bdsim_model = sim.blockdiagram()
+
+        # Create blocks
+        for item in self.canvas.scene.items():
+            if hasattr(item, "create_bdsim_instance"):
+                item.create_bdsim_instance(bdsim_model)
+
+        # Create connections
+        for item in self.canvas.scene.items():
+            if hasattr(item, "create_bdsim_connection"):
+                item.create_bdsim_connection(bdsim_model)
+
+        # Compile and run simulation
+        try:
+            bdsim_model.compile()
+            results = sim.run(bdsim_model, 5)
+
+            # Plot results
+            if "scope.0" in results["out"]:
+                scope_data = results["out"]["scope.0"]
+                self.plot_canvas.plot(scope_data.t, scope_data.y)
+            else:
+                self.plot_canvas.plot([], [])  # No data to plot
+        except Exception as e:
+            print(f"Simulation Error: {e}")
 
 
 if __name__ == "__main__":
