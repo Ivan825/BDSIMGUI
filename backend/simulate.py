@@ -2,8 +2,15 @@ import matplotlib
 import matplotlib.pyplot as plt
 import bdsim
 
-def run_bdsim_simulation(blocks, wires):
-    """Run the BDSim simulation and only display the Matplotlib plot."""
+
+def run_bdsim_simulation(blocks, wires, T=5):
+    """
+    Run the BDSim simulation and only display the Matplotlib plot.
+
+    :param blocks: List of blocks for the block diagram.
+    :param wires: List of wires connecting the blocks.
+    :param T: Simulation time (default is 5 seconds).
+    """
     sim = bdsim.BDSim()  # Create BDSim instance
     bd = sim.blockdiagram()  # Create block diagram
 
@@ -40,7 +47,7 @@ def run_bdsim_simulation(blocks, wires):
     bd.compile()
 
     try:
-        results = sim.run(bd, T=5, block=False)  # Disable blocking behavior in built-in run
+        results = sim.run(bd, T=T, block=False)  # Pass user-defined simulation time
 
         # Collect and plot scope data
         for block_name, block in block_instances.items():
@@ -59,6 +66,7 @@ def run_bdsim_simulation(blocks, wires):
     except Exception as e:
         print(f"Simulation failed: {e}")
 
+
 # Example usage
 if __name__ == "__main__":
     # Define example blocks and wires
@@ -73,4 +81,7 @@ if __name__ == "__main__":
         {"start": "Gain1", "end": "Scope1"},
     ]
 
-    run_bdsim_simulation(blocks, wires)
+    # Allow the user to specify the simulation time
+    simulation_time = float(input("Enter simulation time (seconds): ") or 5)
+
+    run_bdsim_simulation(blocks, wires, T=simulation_time)

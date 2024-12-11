@@ -1,34 +1,11 @@
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QWidget, QSplitter, QToolBar, QComboBox, QLabel, QAction
+    QApplication, QMainWindow, QVBoxLayout, QWidget, QSplitter, QToolBar,
+    QComboBox, QLabel, QAction, QLineEdit, QMessageBox
 )
 from PyQt5.QtCore import Qt
 from GUI.canvas import DiagramCanvas
 from GUI.properties import PropertiesEditor
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-from GUI.wires import Wire
-from bdsim import BDSim
-from GUI.blocks import Block
-
 from backend.simulate import run_bdsim_simulation
-
-
-class PlotCanvas(FigureCanvas):
-    """A Matplotlib-based widget for plotting simulation results."""
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.ax = self.fig.add_subplot(111)
-        super().__init__(self.fig)
-
-    def plot(self, time, data, label="Simulation"):
-        """Clear the canvas and plot new data."""
-        self.ax.clear()
-        self.ax.plot(time, data, label=label)
-        self.ax.set_title("Simulation Results")
-        self.ax.set_xlabel("Time (s)")
-        self.ax.set_ylabel("Value")
-        self.ax.legend()
-        self.draw()
 
 
 class MainWindow(QMainWindow):
@@ -65,6 +42,12 @@ class MainWindow(QMainWindow):
         delete_action = QAction("Delete Selected", self)
         delete_action.triggered.connect(self.delete_selected)
         self.toolbar.addAction(delete_action)
+
+        # Simulation Time Input
+        self.sim_time_label = QLabel("Simulation Time:")
+        self.sim_time_input = QLineEdit("5")  # Default value is 5 seconds
+        self.toolbar.addWidget(self.sim_time_label)
+        self.toolbar.addWidget(self.sim_time_input)
 
         # Simulate Button
         simulate_action = QAction("Simulate", self)
@@ -116,14 +99,16 @@ class MainWindow(QMainWindow):
         # Ensure there is at least one SCOPE block
         scope_present = any(block["type"] == "SCOPE" for block in blocks)
         if not scope_present:
-            print("Simulation Error: No SCOPE block present.")
+            self.show_error_message("Simulation Error: No SCOPE block present.")
             return False
 
         # Ensure all wires connect valid blocks
         block_names = {block["name"] for block in blocks}
         for wire in wires:
             if wire["start"] not in block_names or wire["end"] not in block_names:
-                print(f"Simulation Error: Invalid connection {wire['start']} -> {wire['end']}.")
+                self.show_error_message(
+                    f"Simulation Error: Invalid connection {wire['start']} -> {wire['end']}."
+                )
                 return False
 
         return True
@@ -137,15 +122,23 @@ class MainWindow(QMainWindow):
             if not self.validate_blocks_and_wires(blocks, wires):
                 return
 
+            # Get simulation time
+            try:
+                sim_time = float(self.sim_time_input.text())
+                if sim_time <= 0:
+                    raise ValueError("Simulation time must be greater than zero.")
+            except ValueError as e:
+                self.show_error_message(f"Invalid simulation time: {e}")
+                return
+
             # Run simulation with updated logic
-            run_bdsim_simulation(blocks, wires)
+            run_bdsim_simulation(blocks, wires, T=sim_time)
 
         except Exception as e:
             self.show_error_message(str(e))
 
     def show_error_message(self, message):
         """Display an error message in a dialog box."""
-        from PyQt5.QtWidgets import QMessageBox
         error_dialog = QMessageBox(self)
         error_dialog.setIcon(QMessageBox.Critical)
         error_dialog.setWindowTitle("Simulation Error")
