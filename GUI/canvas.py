@@ -19,10 +19,33 @@ class DiagramCanvas(QGraphicsView):
         # Reference to the properties editor
         self.properties_editor = properties_editor
 
-        # Wire drawing
+        # Wire drawing state
         self.start_port = None
         self.temp_wire = None
 
+    def get_blocks_and_wires(self):
+        """Retrieve all blocks and wires from the canvas for simulation."""
+        blocks = []
+        wires = []
+
+        for item in self.scene.items():
+            if isinstance(item, Block):
+                block_data = {
+                    "type": item.block_type,
+                    "name": item.name,
+                    "properties": item.properties
+                }
+                blocks.append(block_data)
+            elif isinstance(item, Wire):
+                wire_data = {
+                    "start": item.start_port.parentItem().name,
+                    "end": item.end_port.parentItem().name
+                }
+                wires.append(wire_data)
+
+        return blocks, wires
+
+        return blocks, wires
     def add_block(self, block_type, x=100, y=100):
         """Add a block of the specified type to the canvas."""
         block = Block(block_type)
@@ -37,17 +60,21 @@ class DiagramCanvas(QGraphicsView):
             # Pass the selected block to the properties editor
             if self.properties_editor:
                 self.properties_editor.set_block(item)
+
         elif isinstance(item, Port) and item.port_type == "output":
-            # Start wire drawing
+            # Start wire drawing from an output port
             self.start_port = item
             self.temp_wire = Wire(self.start_port, None)
             self.scene.addItem(self.temp_wire)
+
         elif self.start_port and isinstance(item, Port) and item.port_type == "input":
-            # Complete the wire if connected to a valid input port
-            self.temp_wire.end_port = item
-            self.temp_wire.update_position()
-            self.temp_wire = None
-            self.start_port = None
+            # Complete the wire connection to a valid input port
+            if self.temp_wire:
+                self.temp_wire.end_port = item
+                self.temp_wire.update_position()
+                self.temp_wire = None
+                self.start_port = None
+
         else:
             # Reset wire drawing if no valid connection
             if self.temp_wire:
@@ -63,3 +90,11 @@ class DiagramCanvas(QGraphicsView):
             cursor_pos = self.mapToScene(event.pos())
             self.temp_wire.update_temp_position(cursor_pos)
         super().mouseMoveEvent(event)
+
+    def keyPressEvent(self, event):
+        """Handle key presses for operations like deletion."""
+        if event.key() == Qt.Key_Delete:
+            # Delete selected items (blocks or wires)
+            for item in self.scene.selectedItems():
+                self.scene.removeItem(item)
+        super().keyPressEvent(event)

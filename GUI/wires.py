@@ -44,8 +44,14 @@ class Wire(QGraphicsLineItem):
 
     def create_bdsim_connection(self, bdsim_model):
         """Connect bdsim blocks via ports."""
+        # Ensure both ports are valid
+        if not self.start_port or not self.end_port:
+            print("Invalid wire: Missing start or end port.")
+            return
+
         start_block = self.start_port.parentItem()
         end_block = self.end_port.parentItem()
+
         if (
                 start_block.bdsim_instance
                 and end_block.bdsim_instance

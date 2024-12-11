@@ -38,25 +38,33 @@ class Block(QGraphicsRectItem):
         self.add_ports()
 
     def create_bdsim_instance(self, bdsim_model):
-        """Create a bdsim instance for this block."""
-        if self.block_type == "STEP":
-            self.bdsim_instance = bdsim_model.STEP(
-                T=float(self.properties.get("Start Time", 0)),
-                A=float(self.properties.get("Amplitude", 1)),
-                name=self.name,
-            )
-        elif self.block_type == "GAIN":
-            self.bdsim_instance = bdsim_model.GAIN(
-                K=float(self.properties.get("Gain", 1)),
-                name=self.name,
-            )
-        elif self.block_type == "SUM":
-            self.bdsim_instance = bdsim_model.SUM(
-                signs=self.properties.get("Signs", "+-"),
-                name=self.name,
-            )
-        elif self.block_type == "SCOPE":
-            self.bdsim_instance = bdsim_model.SCOPE(name=self.name)
+        """Create a bdsim block instance for this block."""
+        try:
+            if self.block_type == "STEP":
+                self.bdsim_instance = bdsim_model.STEP(
+                    A=self.properties.get("Amplitude", 1),
+                    T=self.properties.get("Start Time", 0),
+                    name=self.name,
+                )
+            elif self.block_type == "GAIN":
+                self.bdsim_instance = bdsim_model.GAIN(
+                    K=self.properties.get("Gain", 1),
+                    name=self.name,
+                )
+            elif self.block_type == "SUM":
+                self.bdsim_instance = bdsim_model.SUM(
+                    gains=self.properties.get("Inputs", "+-"),
+                    name=self.name,
+                )
+            elif self.block_type == "SCOPE":
+                self.bdsim_instance = bdsim_model.SCOPE(
+                    styles=[self.properties.get("Style", "Line")],
+                    name=self.name,
+                )
+            else:
+                print(f"Unsupported block type: {self.block_type}")
+        except Exception as e:
+            print(f"Error creating bdsim instance for {self.name}: {e}")
 
     def add_ports(self):
         """Add ports to the block based on its type."""

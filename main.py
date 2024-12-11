@@ -6,7 +6,11 @@ from GUI.canvas import DiagramCanvas
 from GUI.properties import PropertiesEditor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from GUI.wires import Wire
 from bdsim import BDSim
+from GUI.blocks import Block
+
+from backend.simulate import run_bdsim_simulation
 
 
 class PlotCanvas(FigureCanvas):
@@ -16,10 +20,10 @@ class PlotCanvas(FigureCanvas):
         self.ax = self.fig.add_subplot(111)
         super().__init__(self.fig)
 
-    def plot(self, x, y):
+    def plot(self, time, data, label="Simulation"):
         """Clear the canvas and plot new data."""
         self.ax.clear()
-        self.ax.plot(x, y, label="Simulation Data")
+        self.ax.plot(time, data, label=label)
         self.ax.set_title("Simulation Results")
         self.ax.set_xlabel("Time (s)")
         self.ax.set_ylabel("Value")
@@ -73,18 +77,14 @@ class MainWindow(QMainWindow):
         # Diagram Canvas
         self.canvas = DiagramCanvas(properties_editor=self.properties_editor)
 
-        # Plotting Canvas
-        self.plot_canvas = PlotCanvas()
-
         # Layouts
         self.splitter = QSplitter(Qt.Horizontal)
         self.splitter.addWidget(self.canvas)
 
-        # Right Panel (Properties + Plot)
+        # Right Panel (Properties)
         self.right_panel = QWidget()
         self.right_layout = QVBoxLayout()
         self.right_layout.addWidget(self.properties_editor)
-        self.right_layout.addWidget(self.plot_canvas)
         self.right_panel.setLayout(self.right_layout)
 
         self.splitter.addWidget(self.right_panel)
@@ -111,39 +111,37 @@ class MainWindow(QMainWindow):
         for item in self.canvas.scene.selectedItems():
             self.canvas.scene.removeItem(item)
 
+    def validate_blocks_and_wires(self, blocks, wires):
+        """Validate blocks and wires before simulation."""
+        # Ensure there is at least one SCOPE block
+        scope_present = any(block["type"] == "SCOPE" for block in blocks)
+        if not scope_present:
+            print("Simulation Error: No SCOPE block present.")
+            return False
+
+        # Ensure all wires connect valid blocks
+        block_names = {block["name"] for block in blocks}
+        for wire in wires:
+            if wire["start"] not in block_names or wire["end"] not in block_names:
+                print(f"Simulation Error: Invalid connection {wire['start']} -> {wire['end']}.")
+                return False
+
+        return True
+
     def simulate(self):
-        """Compile the current diagram into a bdsim model and simulate."""
-        from bdsim import BDSim
+        """Run the simulation using bdsim."""
+        blocks, wires = self.canvas.get_blocks_and_wires()
 
-        sim = BDSim()
-        bdsim_model = sim.blockdiagram()
-
-        # Create blocks
-        for item in self.canvas.scene.items():
-            if hasattr(item, "create_bdsim_instance"):
-                item.create_bdsim_instance(bdsim_model)
-
-        # Create connections
-        for item in self.canvas.scene.items():
-            if hasattr(item, "create_bdsim_connection"):
-                item.create_bdsim_connection(bdsim_model)
-
-        # Compile and run simulation
         try:
-            bdsim_model.compile()
-            results = sim.run(bdsim_model, 5)
+            # Validate blocks and wires before simulation
+            if not self.validate_blocks_and_wires(blocks, wires):
+                return
 
-            # Ensure results contain a SCOPE block
-            if "scope.0" in results["out"]:
-                scope_data = results["out"]["scope.0"]
-                self.plot_canvas.plot(scope_data.t, scope_data.y)
-            else:
-                print("No valid SCOPE block found in the diagram.")
-                self.show_error_message(
-                    "No valid SCOPE block found in the diagram. Add a SCOPE block and connect it properly.")
+            # Run simulation with updated logic
+            run_bdsim_simulation(blocks, wires)
+
         except Exception as e:
-            print(f"Simulation Error: {e}")
-            self.show_error_message(f"Simulation Error: {e}")
+            self.show_error_message(str(e))
 
     def show_error_message(self, message):
         """Display an error message in a dialog box."""

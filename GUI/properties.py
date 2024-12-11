@@ -48,3 +48,22 @@ class PropertiesEditor(QWidget):
             block.properties[prop] = type(block.properties[prop])(value)
         except ValueError:
             block.properties[prop] = value
+
+    def update_properties(self, block):
+        """Update properties based on the selected block."""
+        self.clear()  # Remove existing property fields
+        self.block = block
+
+        if not self.block:
+            return
+
+        self.add_item(QLabel(f"Properties for {block.name}"))
+        for prop_name, prop_value in block.properties.items():
+            label = QLabel(prop_name)
+            input_field = QLineEdit(str(prop_value))
+            input_field.editingFinished.connect(
+                lambda name=prop_name, field=input_field: self.update_block_property(name, field)
+            )
+            self.add_item(label)
+            self.add_item(input_field)
+
