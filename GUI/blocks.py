@@ -16,8 +16,7 @@ class Block(QGraphicsRectItem):
             QGraphicsItem.ItemSendsGeometryChanges
         )
         self.block_type = block_type
-        self.properties = properties or {}  # Editable properties
-        self.bdsim_instance = None
+        self.properties = properties or {}
 
         # Assign a unique name
         if block_type not in Block.instance_counter:
@@ -72,7 +71,7 @@ class Block(QGraphicsRectItem):
 
         # Define ports based on the block type
         if self.block_type == "STEP":
-            num_inputs, num_outputs = 0, 1
+            num_inputs, num_outputs = 0, 1  # STEP block only has an output port
             self.properties = {"Amplitude": 1, "Start Time": 0}
         elif self.block_type == "GAIN":
             num_inputs, num_outputs = 1, 1
@@ -86,6 +85,10 @@ class Block(QGraphicsRectItem):
         else:
             num_inputs, num_outputs = 0, 0  # Default for unknown types
 
+        # Clear existing ports
+        self.input_ports = []
+        self.output_ports = []
+
         # Create input ports
         for i in range(num_inputs):
             port = Port(self, "input")
@@ -98,11 +101,22 @@ class Block(QGraphicsRectItem):
             port.setPos(self.rect().right(), self.rect().top() + i * port_spacing + 10)
             self.output_ports.append(port)
 
+    def itemChange(self, change, value):
+        """Update ports when block is moved."""
+        if change == QGraphicsItem.ItemPositionChange:
+            for port in self.input_ports + self.output_ports:
+                port.notify_wires()
+        return super().itemChange(change, value)
+
 
 class Port(QGraphicsEllipseItem):
-    """A port on a block."""
-    def __init__(self, parent, port_type, radius=10):
-        super().__init__(-radius / 2, -radius / 2, radius, radius, parent)
+    def __init__(self, parent, port_type, radius=5):
+        super().__init__(-radius, -radius, 2 * radius, 2 * radius, parent)
+        self.port_type = port_type
         self.setBrush(Qt.darkGray)
-        self.port_type = port_type  # Either "input" or "output"
-        self.setZValue(1)  # Ensure ports are always on top
+        self.connected_wires = []
+
+    def notify_wires(self):
+        """Notify connected wires to update their positions."""
+        for wire in self.connected_wires:
+            wire.update_position()

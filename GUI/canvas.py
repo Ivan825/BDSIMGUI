@@ -64,14 +64,13 @@ class DiagramCanvas(QGraphicsView):
         elif isinstance(item, Port) and item.port_type == "output":
             # Start wire drawing from an output port
             self.start_port = item
-            self.temp_wire = Wire(self.start_port, None)
+            self.temp_wire = Wire(self.start_port)
             self.scene.addItem(self.temp_wire)
 
         elif self.start_port and isinstance(item, Port) and item.port_type == "input":
             # Complete the wire connection to a valid input port
             if self.temp_wire:
-                self.temp_wire.end_port = item
-                self.temp_wire.update_position()
+                self.temp_wire.set_end_port(item)  # Dynamically set the end_port
                 self.temp_wire = None
                 self.start_port = None
 
