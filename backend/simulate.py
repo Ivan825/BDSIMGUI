@@ -1,7 +1,7 @@
 import matplotlib
 import matplotlib.pyplot as plt
 import bdsim
-
+from bdsim.blocks.displays import Scope
 
 def run_bdsim_simulation(blocks, wires, T=5):
     """
@@ -48,20 +48,20 @@ def run_bdsim_simulation(blocks, wires, T=5):
 
     try:
         results = sim.run(bd, T=T, block=False)  # Pass user-defined simulation time
-
-        # Collect and plot scope data
-        for block_name, block in block_instances.items():
-            if isinstance(block, bdsim.blocks.displays.Scope):
-                plt.figure()
-                plt.plot(results.t, block.tdata, label=block_name)
-                plt.title(f"Simulation Results: {block_name}")
-                plt.xlabel("Time (s)")
-                plt.ylabel("Value")
-                plt.legend()
-                plt.grid()
-
-        # Ensure the Matplotlib plot remains open
-        plt.show(block=True)
+        '''If ever need to display in screen take every alternate value in results and plot only if ever needed'''
+        # # Collect and plot scope data
+        # for block_name, block in block_instances.items():
+        #     if isinstance(block, bdsim.blocks.displays.Scope):
+        #         plt.figure()
+        #         plt.plot(results.t, block.tdata, label=block_name)
+        #         plt.title(f"Simulation Results: {block_name}")
+        #         plt.xlabel("Time (s)")
+        #         plt.ylabel("Value")
+        #         plt.legend()
+        #         plt.grid()
+        #
+        # # Ensure the Matplotlib plot remains open
+        # plt.show(block=True)
 
     except Exception as e:
         print(f"Simulation failed: {e}")
