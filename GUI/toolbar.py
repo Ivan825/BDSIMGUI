@@ -24,6 +24,15 @@ class Toolbar(QToolBar):
         self.run_simulation_action.triggered.connect(self.run_simulation)
         self.addAction(self.run_simulation_action)
 
+        # Toolbar for Save and Load
+        save_action = QAction("Save Diagram", self)
+        save_action.triggered.connect(self.save_to_file)
+        self.toolbar.addAction(save_action)
+
+        load_action = QAction("Load Diagram", self)
+        load_action.triggered.connect(self.load_from_file)
+        self.toolbar.addAction(load_action)
+
     def set_canvas(self, canvas):
         """Connect the toolbar to the diagram canvas."""
         self.canvas = canvas

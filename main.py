@@ -6,6 +6,8 @@ from PyQt5.QtCore import Qt
 from GUI.canvas import DiagramCanvas
 from GUI.properties import PropertiesEditor
 from backend.simulate import run_bdsim_simulation
+import json
+from PyQt5.QtWidgets import QFileDialog
 
 
 class MainWindow(QMainWindow):
@@ -53,6 +55,16 @@ class MainWindow(QMainWindow):
         simulate_action = QAction("Simulate", self)
         simulate_action.triggered.connect(self.simulate)
         self.toolbar.addAction(simulate_action)
+
+        # Save Button
+        save_action = QAction("Save Diagram", self)
+        save_action.triggered.connect(self.save_to_file)  # Pass function reference without parentheses
+        self.toolbar.addAction(save_action)
+
+        # Load Button
+        load_action = QAction("Load Diagram", self)
+        load_action.triggered.connect(self.load_from_file)  # Pass function reference without parentheses
+        self.toolbar.addAction(load_action)
 
         # Properties Editor
         self.properties_editor = PropertiesEditor()
@@ -136,6 +148,66 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             self.show_error_message(str(e))
+
+    def save_to_file(self):
+        """Save the current block diagram to a file."""
+        blocks, wires = self.canvas.get_blocks_and_wires()
+
+        # Serialize the block diagram
+        diagram_data = {
+            "blocks": blocks,
+            "wires": wires
+        }
+
+        # Open a save dialog
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save Diagram", "", "JSON Files (*.json);;All Files (*)",
+                                                   options=options)
+
+        if file_name:
+            try:
+                with open(file_name, "w") as file:
+                    json.dump(diagram_data, file, indent=4)
+                QMessageBox.information(self, "Success", f"Diagram saved to {file_name}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to save file: {e}")
+
+    def load_from_file(self):
+        """Load a block diagram from a file."""
+        # Open a load dialog
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getOpenFileName(self, "Load Diagram", "", "JSON Files (*.json);;All Files (*)",
+                                                   options=options)
+
+        if file_name:
+            try:
+                with open(file_name, "r") as file:
+                    diagram_data = json.load(file)
+
+                # Clear the canvas
+                self.canvas.scene.clear()
+
+                # Add blocks
+                for block in diagram_data["blocks"]:
+                    block_type = block["type"]
+                    x, y = block["x"], block["y"]
+                    block_instance = self.canvas.add_block(block_type, x, y)
+
+                    # Set block properties
+                    for prop, value in block["properties"].items():
+                        block_instance.properties[prop] = value
+
+                # Add wires
+                for wire in diagram_data["wires"]:
+                    start_block_name = wire["start"]
+                    start_port_index = wire.get("start_port", 0)
+                    end_block_name = wire["end"]
+                    end_port_index = wire.get("end_port", 0)
+                    self.canvas.add_wire(start_block_name, start_port_index, end_block_name, end_port_index)
+
+                QMessageBox.information(self, "Success", f"Diagram loaded from {file_name}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load file: {e}")
 
     def show_error_message(self, message):
         """Display an error message in a dialog box."""
