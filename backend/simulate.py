@@ -17,6 +17,7 @@ def run_bdsim_simulation(blocks, wires, T=5):
     # Create block instances
     block_instances = {}
     for block in blocks:
+        print(block["name"])
         block_type = block["type"]
         name = block["name"]
         properties = block["properties"]
@@ -36,12 +37,37 @@ def run_bdsim_simulation(blocks, wires, T=5):
             block_instances[name] = bd.SCOPE(name=name)
         else:
             raise ValueError(f"Unsupported block type: {block_type}")
-
     # Connect wires
     for wire in wires:
         start = wire["start"]
         end = wire["end"]
-        bd.connect(block_instances[start], block_instances[end])
+
+        # Check if the end block is a SUM block or if input-output ports mismatch
+        if block_instances[start].nout != block_instances[end].nin or block_instances[end].type == "sum":
+            # Connect specific output of start to an available input port of end
+            start_port = wire.get("start_port", 0)  # Specify which output port to use, default is 0
+            end_block = block_instances[end]
+
+            # Find the first available input port for the SUM block
+            available_input_port = None
+            try:
+                for port in range(end_block.nin):
+                    # Check if a wire is already connected to this port
+                    if not any(w.end.port == port for w in bd.wirelist if w.end.block == end_block):
+                        available_input_port = port
+                        break
+
+                if available_input_port is None:
+                    raise RuntimeError(f"All input ports on block {end} are already occupied!")
+
+                # Connect start's specific output to the first available input of end
+                bd.connect(block_instances[start][start_port], block_instances[end][available_input_port])
+            except AttributeError as e:
+                raise RuntimeError(f"Error connecting to block {end}: {str(e)}")
+
+        else:
+            # Connect entire blocks if inputs and outputs match
+            bd.connect(block_instances[start], block_instances[end])
 
     # Compile and run the simulation
     bd.compile()
