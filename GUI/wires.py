@@ -85,10 +85,8 @@ class Wire(QGraphicsLineItem):
             print(f"Invalid connection between {start_block.name} and {end_block.name}.")
 
     def remove_wire(self):
-        """Remove the wire from the scene and disconnect from ports."""
-        if self.start_port:
-            self.start_port.connected_wires.remove(self)
-        if self.end_port:
-            self.end_port.connected_wires.remove(self)
-        self.scene().removeItem(self)  # Remove the wire from the scene
+        """Safely remove the wire from the scene."""
+        if self.scene():  # Check if the wire is still in a valid scene
+            self.scene().removeItem(self)  # Remove the wire from the scene
+
 

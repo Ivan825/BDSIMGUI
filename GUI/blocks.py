@@ -1,6 +1,10 @@
 from PyQt5.QtGui import QPen, QColor, QFont
 from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsItem, QGraphicsTextItem, QGraphicsLineItem
 from PyQt5.QtCore import Qt, QPointF, QLineF
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.ERROR, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 class Block(QGraphicsRectItem):
@@ -153,8 +157,12 @@ class Block(QGraphicsRectItem):
     def itemChange(self, change, value):
         """Update ports when block is moved."""
         if change == QGraphicsItem.ItemPositionChange:
-            for port in self.input_ports + self.output_ports:
-                port.notify_wires()
+            try:
+                for port in self.input_ports + self.output_ports:
+                    if port:  # Check if port is valid
+                        port.notify_wires()
+            except Exception as e:
+                print(f"Error updating port wires: {e}")
         return super().itemChange(change, value)
 
 
@@ -166,16 +174,28 @@ class Port(QGraphicsEllipseItem):
         self.connected_wires = []  # Track wires connected to this port
 
     def notify_wires(self):
-        """Notify connected wires to update their positions."""
-        for wire in self.connected_wires:
-            wire.update_position()
+        """Safely notify connected wires to update their positions."""
+        try:
+            for wire in self.connected_wires:
+                if wire:  # Check if wire is valid
+                    wire.update_position()
+        except Exception as e:
+            print(f"Error notifying wires: {e}")
 
     def remove_connected_wires(self):
         """Remove all wires connected to this port."""
-        for wire in self.connected_wires[:]:  # Use a copy of the list to avoid mutation during iteration
-            wire.remove_wire()
+        for wire in list(self.connected_wires):  # Use a copy of the list
+            if wire:  # Check if wire is not None
+                wire.remove_wire()
+        self.connected_wires.clear()  # Clear the list
 
     def __del__(self):
-        """Ensure connected wires are removed when the port is deleted."""
-        self.remove_connected_wires()
+        """Safely clean up ports and wires."""
+        try:
+            for port in self.input_ports + self.output_ports:
+                if port:  # Check if port is valid
+                    port.remove_connected_wires()
+        except Exception as e:
+            logging.error(f"Error during block deletion: {e}")
+
 
