@@ -27,7 +27,7 @@ class MainWindow(QMainWindow):
         # Block Type Selector
         self.block_type_label = QLabel("Block Type:")
         self.block_type_selector = QComboBox()
-        self.block_type_selector.addItems(["STEP", "GAIN", "SUM", "SCOPE"])
+        self.block_type_selector.addItems(["STEP", "GAIN", "SUM", "SCOPE", "RAMP", "WAVEFORM", "CONSTANT", "LTI"])
         self.block_type_selector.currentTextChanged.connect(self.set_block_type)
 
         self.toolbar.addWidget(self.block_type_label)

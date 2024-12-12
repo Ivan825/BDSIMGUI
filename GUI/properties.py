@@ -31,6 +31,7 @@ class PropertiesEditor(QWidget):
         block_label = QLabel(f"{block.name}")
         self.scroll_layout.addRow(block_label)
 
+        # Handle different block types and their properties
         for prop, value in block.properties.items():
             label = QLabel(prop)
             input_field = QLineEdit(str(value))
@@ -67,3 +68,22 @@ class PropertiesEditor(QWidget):
             self.add_item(label)
             self.add_item(input_field)
 
+    def clear(self):
+        """Clear all property fields."""
+        for i in reversed(range(self.scroll_layout.count())):
+            widget = self.scroll_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+
+    def add_item(self, item):
+        """Add a widget to the properties editor."""
+        self.scroll_layout.addRow(item)
+
+    def update_block_property(self, name, field):
+        """Update the value of a specific property."""
+        try:
+            value = field.text()
+            # Convert to the appropriate type if possible
+            self.block.properties[name] = type(self.block.properties[name])(value)
+        except ValueError:
+            self.block.properties[name] = value

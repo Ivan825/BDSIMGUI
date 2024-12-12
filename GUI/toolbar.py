@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QToolBar, QAction
+from PyQt5.QtWidgets import QToolBar, QAction, QComboBox, QLabel
 from PyQt5.QtGui import QIcon
 
 class Toolbar(QToolBar):
@@ -6,6 +6,13 @@ class Toolbar(QToolBar):
         super().__init__()
         self.canvas = None
         self.plot_canvas = None
+
+        # Add Block Type Selector
+        self.block_type_label = QLabel("Block Type:")
+        self.block_type_selector = QComboBox()
+        self.block_type_selector.addItems(["STEP", "GAIN", "SUM", "SCOPE", "RAMP", "WAVEFORM", "CONSTANT", "LTI"])
+        self.addWidget(self.block_type_label)
+        self.addWidget(self.block_type_selector)
 
         # Add Block Action
         self.add_block_action = QAction(QIcon(None), "Add Block", self)
@@ -28,9 +35,9 @@ class Toolbar(QToolBar):
     def add_block(self):
         """Add a block to the diagram canvas."""
         if self.canvas:
-            print("Adding a block to the canvas...")
-            # Add the block at a fixed position (customize as needed)
-            self.canvas.add_block(name="New Block", x=100, y=100)
+            block_type = self.block_type_selector.currentText()
+            print(f"Adding block: {block_type}")
+            self.canvas.add_block(block_type, 100, 100)
 
     def run_simulation(self):
         """Run the simulation and display results."""

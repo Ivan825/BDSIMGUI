@@ -7,9 +7,9 @@ def run_bdsim_simulation(blocks, wires, T=5):
     """
     Run the BDSim simulation and only display the Matplotlib plot.
 
-    :param blocks: List of blocks for the block diagram.
-    :param wires: List of wires connecting the blocks.
-    :param T: Simulation time (default is 5 seconds).
+    blocks: List of blocks for the block diagram.
+     wires: List of wires connecting the blocks.
+     T: Simulation time (default is 5 seconds).
     """
     sim = bdsim.BDSim()  # Create BDSim instance
     bd = sim.blockdiagram()  # Create block diagram
@@ -17,7 +17,6 @@ def run_bdsim_simulation(blocks, wires, T=5):
     # Create block instances
     block_instances = {}
     for block in blocks:
-        print(block["name"])
         block_type = block["type"]
         name = block["name"]
         properties = block["properties"]
@@ -35,6 +34,32 @@ def run_bdsim_simulation(blocks, wires, T=5):
             block_instances[name] = bd.SUM(properties.get("Inputs", "+-"), name=name)
         elif block_type == "SCOPE":
             block_instances[name] = bd.SCOPE(name=name)
+        elif block_type == "RAMP":
+            block_instances[name] = bd.RAMP(
+                T=properties.get("Start Time", 0),
+                slope=properties.get("Slope", 1),
+                name=name,
+            )
+        elif block_type == "WAVEFORM":
+            block_instances[name] = bd.WAVEFORM(
+                wave=properties.get("Wave Type", "square"),
+                freq=properties.get("Frequency", 1),
+                amplitude=properties.get("Amplitude", 1),
+                offset=properties.get("Offset", 0),
+                phase=properties.get("Phase", 0),
+                name=name,
+            )
+        elif block_type == "CONSTANT":
+            block_instances[name] = bd.CONSTANT(
+                value=properties.get("Value", 0),
+                name=name,
+            )
+        elif block_type == "LTI":
+            block_instances[name] = bd.LTI_SISO(
+                N=properties.get("Numerator", [1]),
+                D=properties.get("Denominator", [1, 1]),
+                name=name,
+            )
         else:
             raise ValueError(f"Unsupported block type: {block_type}")
     # Connect wires
@@ -86,28 +111,11 @@ def run_bdsim_simulation(blocks, wires, T=5):
         #         plt.legend()
         #         plt.grid()
         #
-        # # Ensure the Matplotlib plot remains open
+        #
         # plt.show(block=True)
 
     except Exception as e:
         print(f"Simulation failed: {e}")
 
 
-# Example usage
-if __name__ == "__main__":
-    # Define example blocks and wires
-    blocks = [
-        {"type": "STEP", "name": "Step1", "properties": {"Start Time": 1, "Amplitude": 2}},
-        {"type": "GAIN", "name": "Gain1", "properties": {"Gain": 2}},
-        {"type": "SCOPE", "name": "Scope1", "properties": {}},
-    ]
 
-    wires = [
-        {"start": "Step1", "end": "Gain1"},
-        {"start": "Gain1", "end": "Scope1"},
-    ]
-
-    # Allow the user to specify the simulation time
-    simulation_time = float(input("Enter simulation time (seconds): ") or 5)
-
-    run_bdsim_simulation(blocks, wires, T=simulation_time)

@@ -52,6 +52,15 @@ class DiagramCanvas(QGraphicsView):
         block.setPos(x, y)
         self.scene.addItem(block)
 
+    def delete_selected(self):
+        """Delete all selected items (blocks, wires, or groups)."""
+        for item in self.scene.selectedItems():
+            if isinstance(item, Block):
+                # Remove wires connected to the block
+                for port in item.input_ports + item.output_ports:
+                    port.remove_connected_wires()
+            self.scene.removeItem(item)
+
     def mousePressEvent(self, event):
         """Handle mouse press for selecting or starting a wire."""
         item = self.itemAt(event.pos())

@@ -60,6 +60,32 @@ class Block(QGraphicsRectItem):
                     styles=[self.properties.get("Style", "Line")],
                     name=self.name,
                 )
+            elif self.block_type == "RAMP":
+                self.bdsim_instance = bdsim_model.RAMP(
+                    T=self.properties.get("Start Time", 0),
+                    slope=self.properties.get("Slope", 1),
+                    name=self.name,
+                )
+            elif self.block_type == "WAVEFORM":
+                self.bdsim_instance = bdsim_model.WAVEFORM(
+                    wave=self.properties.get("Wave Type", "square"),
+                    freq=self.properties.get("Frequency", 1),
+                    amplitude=self.properties.get("Amplitude", 1),
+                    offset=self.properties.get("Offset", 0),
+                    phase=self.properties.get("Phase", 0),
+                    name=self.name,
+                )
+            elif self.block_type == "CONSTANT":
+                self.bdsim_instance = bdsim_model.CONSTANT(
+                    value=self.properties.get("Value", 0),
+                    name=self.name,
+                )
+            elif self.block_type == "LTI":
+                self.bdsim_instance = bdsim_model.LTI_SISO(
+                    N=self.properties.get("Numerator", [1]),
+                    D=self.properties.get("Denominator", [1, 1]),
+                    name=self.name,
+                )
             else:
                 print(f"Unsupported block type: {self.block_type}")
         except Exception as e:
@@ -82,6 +108,24 @@ class Block(QGraphicsRectItem):
         elif self.block_type == "SCOPE":
             num_inputs, num_outputs = 1, 0
             self.properties = {"Style": "Line"}
+        elif self.block_type == "RAMP":
+            num_inputs, num_outputs = 0, 1
+            self.properties = {"Start Time": 0, "Slope": 1}
+        elif self.block_type == "WAVEFORM":
+            num_inputs, num_outputs = 0, 1
+            self.properties = {
+                "Wave Type": "square",
+                "Frequency": 1,
+                "Amplitude": 1,
+                "Offset": 0,
+                "Phase": 0,
+            }
+        elif self.block_type == "CONSTANT":
+            num_inputs, num_outputs = 0, 1
+            self.properties = {"Value": 0}
+        elif self.block_type == "LTI":
+            num_inputs, num_outputs = 1, 1
+            self.properties = {"Numerator": [1], "Denominator": [1, 1]}
         else:
             num_inputs, num_outputs = 0, 0  # Default for unknown types
 
@@ -101,6 +145,11 @@ class Block(QGraphicsRectItem):
             port.setPos(self.rect().right(), self.rect().top() + i * port_spacing + 10)
             self.output_ports.append(port)
 
+    def __del__(self):
+        """Ensure all connected wires are removed when the block is deleted."""
+        for port in self.input_ports + self.output_ports:
+            port.remove_connected_wires()
+
     def itemChange(self, change, value):
         """Update ports when block is moved."""
         if change == QGraphicsItem.ItemPositionChange:
@@ -114,9 +163,19 @@ class Port(QGraphicsEllipseItem):
         super().__init__(-radius, -radius, 2 * radius, 2 * radius, parent)
         self.port_type = port_type
         self.setBrush(Qt.darkGray)
-        self.connected_wires = []
+        self.connected_wires = []  # Track wires connected to this port
 
     def notify_wires(self):
         """Notify connected wires to update their positions."""
         for wire in self.connected_wires:
             wire.update_position()
+
+    def remove_connected_wires(self):
+        """Remove all wires connected to this port."""
+        for wire in self.connected_wires[:]:  # Use a copy of the list to avoid mutation during iteration
+            wire.remove_wire()
+
+    def __del__(self):
+        """Ensure connected wires are removed when the port is deleted."""
+        self.remove_connected_wires()
+
