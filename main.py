@@ -8,6 +8,7 @@ from GUI.properties import PropertiesEditor
 from backend.simulate import run_bdsim_simulation
 import json
 from PyQt5.QtWidgets import QFileDialog
+from GUI.blocks import Block
 
 
 class MainWindow(QMainWindow):
@@ -173,41 +174,28 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Failed to save file: {e}")
 
     def load_from_file(self):
-        """Load a block diagram from a file."""
-        # Open a load dialog
+        """Load a block diagram from a file using DiagramCanvas's load_from_file."""
         options = QFileDialog.Options()
         file_name, _ = QFileDialog.getOpenFileName(self, "Load Diagram", "", "JSON Files (*.json);;All Files (*)",
                                                    options=options)
 
         if file_name:
             try:
-                with open(file_name, "r") as file:
-                    diagram_data = json.load(file)
+                # Reset the block naming counter and clear the canvas
+                Block.reset_instance_counter()
 
-                # Clear the canvas
-                self.canvas.scene.clear()
-
-                # Add blocks
-                for block in diagram_data["blocks"]:
-                    block_type = block["type"]
-                    x, y = block["x"], block["y"]
-                    block_instance = self.canvas.add_block(block_type, x, y)
-
-                    # Set block properties
-                    for prop, value in block["properties"].items():
-                        block_instance.properties[prop] = value
-
-                # Add wires
-                for wire in diagram_data["wires"]:
-                    start_block_name = wire["start"]
-                    start_port_index = wire.get("start_port", 0)
-                    end_block_name = wire["end"]
-                    end_port_index = wire.get("end_port", 0)
-                    self.canvas.add_wire(start_block_name, start_port_index, end_block_name, end_port_index)
+                # Call the load_from_file method from DiagramCanvas
+                self.canvas.load_from_file(file_name)
 
                 QMessageBox.information(self, "Success", f"Diagram loaded from {file_name}")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load file: {e}")
+
+    def new_diagram(self):
+        """Start a new diagram with a fresh canvas."""
+        Block.reset_instance_counter()
+        self.canvas.clear()
+        QMessageBox.information(self, "New Diagram", "Started a new diagram!")
 
     def show_error_message(self, message):
         """Display an error message in a dialog box."""

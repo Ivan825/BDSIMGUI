@@ -11,8 +11,8 @@ class Block(QGraphicsRectItem):
     """A draggable block with connection ports and editable properties."""
     instance_counter = {}  # Keeps track of instance numbers per block type
 
-    def __init__(self, block_type, width=100, height=50, properties=None):
-        super().__init__(0, 0, width, height)
+    def __init__(self, block_type, width=100, height=50, properties=None,name=None):
+        super().__init__(0, 0, float(width), float(height))
         self.setBrush(Qt.lightGray)
         self.setFlags(
             QGraphicsItem.ItemIsMovable |
@@ -27,7 +27,10 @@ class Block(QGraphicsRectItem):
             Block.instance_counter[block_type] = 1
         else:
             Block.instance_counter[block_type] += 1
-        self.name = f"{block_type} {Block.instance_counter[block_type]}"
+        if name:
+            self.name = name
+        else:
+            self.name = f"{block_type} {Block.instance_counter[block_type]}"
 
         # Display the block name
         self.name_label = QGraphicsTextItem(self.name, self)
@@ -39,6 +42,11 @@ class Block(QGraphicsRectItem):
         self.input_ports = []
         self.output_ports = []
         self.add_ports()
+
+    @classmethod
+    def reset_instance_counter(cls):
+        """Reset the instance counter for blocks."""
+        cls.instance_counter = {}
 
     def create_bdsim_instance(self, bdsim_model):
         """Create a bdsim block instance for this block."""
@@ -190,12 +198,11 @@ class Port(QGraphicsEllipseItem):
         self.connected_wires.clear()  # Clear the list
 
     def __del__(self):
-        """Safely clean up ports and wires."""
+        """Safely clean up wires connected to this port."""
         try:
-            for port in self.input_ports + self.output_ports:
-                if port:  # Check if port is valid
-                    port.remove_connected_wires()
+            self.remove_connected_wires()  # Remove wires directly connected to this port
         except Exception as e:
-            logging.error(f"Error during block deletion: {e}")
+            logging.error(f"Error during port deletion: {e}")
+
 
 

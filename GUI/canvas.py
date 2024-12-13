@@ -50,9 +50,13 @@ class DiagramCanvas(QGraphicsView):
 
         return blocks, wires
 
-    def add_block(self, block_type, x=100, y=100):
+    def add_block(self, block_type, x=100, y=100, name=None):
         """Add a block of the specified type to the canvas."""
-        block = Block(block_type)
+        if name:
+            block = Block(block_type,name=name)
+
+        else:
+            block = Block(block_type)
         block.setPos(x, y)
         self.scene.addItem(block)
         return block
@@ -60,15 +64,8 @@ class DiagramCanvas(QGraphicsView):
     def add_wire(self, start_block_name, start_port_index, end_block_name, end_port_index):
         """Add a wire between two ports on the canvas."""
         # Find the blocks by their names
-        start_block = None
-        end_block = None
-
-        for item in self.scene.items():
-            if isinstance(item, Block):
-                if item.name == start_block_name:
-                    start_block = item
-                elif item.name == end_block_name:
-                    end_block = item
+        start_block = self.find_block_by_name(start_block_name)
+        end_block = self.find_block_by_name(end_block_name)
 
         if not start_block or not end_block:
             print(f"Error: Could not find blocks {start_block_name} or {end_block_name} for wire.")
@@ -85,11 +82,18 @@ class DiagramCanvas(QGraphicsView):
     def delete_selected(self):
         """Delete all selected items (blocks, wires, or groups)."""
         for item in self.scene.selectedItems():
-            if isinstance(item, Block):
-                # Remove wires connected to the block
-                for port in item.input_ports + item.output_ports:
-                    port.remove_connected_wires()
-            self.scene.removeItem(item)
+            try:
+                if isinstance(item, Block):
+                    # Remove wires connected to the block
+                    for port in item.input_ports + item.output_ports:
+                        if hasattr(port, "remove_connected_wires"):
+                            port.remove_connected_wires()
+                    self.scene.removeItem(item)
+                elif isinstance(item, Wire):
+                    # If it's a wire, remove it directly
+                    self.scene.removeItem(item)
+            except Exception as e:
+                print(f"Error during block deletion: {e}")
 
     def clear(self):
         """Clear all blocks and wires from the canvas."""
@@ -123,6 +127,7 @@ class DiagramCanvas(QGraphicsView):
                     block_type=block_data["type"],
                     x=block_data["x"],
                     y=block_data["y"],
+                    name=block_data["name"],  # Pass the name to preserve it
                 )
                 block.properties.update(block_data["properties"])
 

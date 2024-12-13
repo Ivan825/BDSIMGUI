@@ -29,6 +29,11 @@ class Toolbar(QToolBar):
         save_action.triggered.connect(self.save_to_file)
         self.toolbar.addAction(save_action)
 
+        # New Diagram
+        new_diagram_action = QAction("New Diagram", self)
+        new_diagram_action.triggered.connect(self.new_diagram)
+        self.toolbar.addAction(new_diagram_action)
+
         load_action = QAction("Load Diagram", self)
         load_action.triggered.connect(self.load_from_file)
         self.toolbar.addAction(load_action)
