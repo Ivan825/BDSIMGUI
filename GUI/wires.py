@@ -9,7 +9,7 @@ class Wire(QGraphicsLineItem):
         super().__init__()
         self.start_port = start_port
         self.end_port = None  # Set end_port to None by default
-        self.setPen(QPen(QColor("black"), 2))
+        self.setPen(QPen(QColor("white"), 2))
         self.setZValue(-1)  # Ensure wires are drawn behind blocks
 
         # Add this wire to the start_port's connected wires
@@ -23,8 +23,8 @@ class Wire(QGraphicsLineItem):
 
         # Set properties for interactivity
         self.setFlag(QGraphicsLineItem.ItemIsSelectable, True)
-        self.selected_color = QColor("red")
-        self.default_color = QColor("black")
+        self.selected_color = QColor("white")
+        self.default_color = QColor("white")
 
         # Update wire position
         self.update_position()

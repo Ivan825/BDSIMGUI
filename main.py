@@ -1,14 +1,14 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QWidget, QSplitter, QToolBar,
-    QComboBox, QLabel, QAction, QLineEdit, QMessageBox
+    QComboBox, QLabel, QAction, QLineEdit, QMessageBox, QFileDialog
 )
 from PyQt5.QtCore import Qt
+import json
+
 from GUI.canvas import DiagramCanvas
 from GUI.properties import PropertiesEditor
-from backend.simulate import run_bdsim_simulation
-import json
-from PyQt5.QtWidgets import QFileDialog
 from GUI.blocks import Block
+from backend.simulate import run_bdsim_simulation
 
 
 class MainWindow(QMainWindow):
@@ -19,93 +19,156 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("BDSim GUI")
         self.resize(1200, 800)
 
-        # Create the main layout
+        # Initialize UI components
+        self.setup_ui()
+
+        # Set default block type
+        self.current_block_type = self.block_type_selector.currentText()
+
+    def setup_ui(self):
+        """Setup the main UI components."""
+        # Create the central layout
         self.central_widget = QWidget()
         self.layout = QVBoxLayout()
 
-        # Toolbar
-        self.toolbar = QToolBar("Toolbar")
-        self.addToolBar(self.toolbar)
+        # Create the toolbars
+        self.setup_toolbars()
 
-        # Block Type Selector
+        # Create the properties editor
+        self.properties_editor = PropertiesEditor()
+
+        # Create the diagram canvas
+        self.canvas = DiagramCanvas(properties_editor=self.properties_editor)
+
+        # Create and configure the splitter layout
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.addWidget(self.canvas)
+
+        # Add the properties editor panel
+        self.setup_properties_panel()
+
+        # Add the splitter to the main layout
+        self.layout.addWidget(self.splitter)
+        self.central_widget.setLayout(self.layout)
+        self.setCentralWidget(self.central_widget)
+
+    def setup_toolbars(self):
+        """Setup toolbars with grouped actions split into two rows."""
+        # First toolbar for Block Operations
+        self.block_toolbar = QToolBar("Block Operations")
+        self.addToolBar(Qt.TopToolBarArea, self.block_toolbar)
+
         self.block_type_label = QLabel("Block Type:")
         self.block_type_selector = QComboBox()
         self.block_type_selector.addItems(["STEP", "GAIN", "SUM", "SCOPE", "RAMP", "WAVEFORM", "CONSTANT", "LTI"])
         self.block_type_selector.currentTextChanged.connect(self.set_block_type)
 
-        self.toolbar.addWidget(self.block_type_label)
-        self.toolbar.addWidget(self.block_type_selector)
+        self.block_toolbar.addWidget(self.block_type_label)
+        self.block_toolbar.addWidget(self.block_type_selector)
 
-        # Add "Add Block" Button
         add_block_action = QAction("Add Block", self)
         add_block_action.triggered.connect(self.add_block)
-        self.toolbar.addAction(add_block_action)
+        self.block_toolbar.addAction(add_block_action)
 
-        # Delete Button
         delete_action = QAction("Delete Selected", self)
         delete_action.triggered.connect(self.delete_selected)
-        self.toolbar.addAction(delete_action)
+        self.block_toolbar.addAction(delete_action)
 
-        # Simulation Time Input
+        # Second toolbar for File, Simulation, and Edit actions
+        self.main_toolbar = QToolBar("Main Operations")
+        self.addToolBar(Qt.TopToolBarArea, self.main_toolbar)
+
+        # File Actions
+        file_group_label = QLabel("File Operations:")
+        self.main_toolbar.addWidget(file_group_label)
+
+        save_action = QAction("Save Diagram", self)
+        save_action.triggered.connect(self.save_to_file)
+        self.main_toolbar.addAction(save_action)
+
+        load_action = QAction("Load Diagram", self)
+        load_action.triggered.connect(self.load_from_file)
+        self.main_toolbar.addAction(load_action)
+
+        new_diagram_action = QAction("New Diagram", self)
+        new_diagram_action.triggered.connect(self.new_diagram)
+        self.main_toolbar.addAction(new_diagram_action)
+
+        # Simulation Actions
+        simulation_group_label = QLabel("Simulation:")
+        self.main_toolbar.addWidget(simulation_group_label)
+
         self.sim_time_label = QLabel("Simulation Time:")
         self.sim_time_input = QLineEdit("5")  # Default value is 5 seconds
-        self.toolbar.addWidget(self.sim_time_label)
-        self.toolbar.addWidget(self.sim_time_input)
+        self.main_toolbar.addWidget(self.sim_time_label)
+        self.main_toolbar.addWidget(self.sim_time_input)
 
-        # Simulate Button
         simulate_action = QAction("Simulate", self)
         simulate_action.triggered.connect(self.simulate)
-        self.toolbar.addAction(simulate_action)
+        self.main_toolbar.addAction(simulate_action)
 
-        # Save Button
-        save_action = QAction("Save Diagram", self)
-        save_action.triggered.connect(self.save_to_file)  # Pass function reference without parentheses
-        self.toolbar.addAction(save_action)
+        # Undo/Redo Actions
+        undo_redo_group_label = QLabel("Edit:")
+        self.main_toolbar.addWidget(undo_redo_group_label)
 
-        # Load Button
-        load_action = QAction("Load Diagram", self)
-        load_action.triggered.connect(self.load_from_file)  # Pass function reference without parentheses
-        self.toolbar.addAction(load_action)
+        undo_action = QAction("Undo", self)
+        undo_action.triggered.connect(self.undo_action)
+        self.main_toolbar.addAction(undo_action)
 
-        # Properties Editor
-        self.properties_editor = PropertiesEditor()
+        redo_action = QAction("Redo", self)
+        redo_action.triggered.connect(self.redo_action)
+        self.main_toolbar.addAction(redo_action)
 
-        # Diagram Canvas
-        self.canvas = DiagramCanvas(properties_editor=self.properties_editor)
-
-        # Layouts
-        self.splitter = QSplitter(Qt.Horizontal)
-        self.splitter.addWidget(self.canvas)
-
-        # Right Panel (Properties)
+    def setup_properties_panel(self):
+        """Setup the properties panel."""
         self.right_panel = QWidget()
         self.right_layout = QVBoxLayout()
         self.right_layout.addWidget(self.properties_editor)
         self.right_panel.setLayout(self.right_layout)
 
+        # Add the properties panel to the splitter
         self.splitter.addWidget(self.right_panel)
-        self.splitter.setSizes([800, 400])  # Initial splitter sizes
+        self.splitter.setSizes([800, 400])  # Initial sizes for splitter sections
 
-        self.layout.addWidget(self.splitter)
-        self.central_widget.setLayout(self.layout)
-        self.setCentralWidget(self.central_widget)
-
-        # Set default block type
-        self.current_block_type = self.block_type_selector.currentText()
-
+    # Event Handlers
     def set_block_type(self, block_type):
         """Set the current block type from the dropdown menu."""
         self.current_block_type = block_type
 
     def add_block(self):
         """Add a block of the selected type to the canvas."""
-        x, y = 100, 100  # Default position
-        self.canvas.add_block(self.current_block_type, x, y)
+        self.canvas.add_block(self.current_block_type)
 
     def delete_selected(self):
         """Delete all selected items (blocks, wires, or groups)."""
-        for item in self.canvas.scene.selectedItems():
-            self.canvas.scene.removeItem(item)
+        self.canvas.delete_selected()
+
+    def undo_action(self):
+        """Perform undo action."""
+        self.canvas.undo_action()
+
+    def redo_action(self):
+        """Perform redo action."""
+        self.canvas.redo_action()
+
+    def simulate(self):
+        """Run the simulation using bdsim."""
+        blocks, wires = self.canvas.get_blocks_and_wires()
+
+        try:
+            if not self.validate_blocks_and_wires(blocks, wires):
+                return
+
+            # Get simulation time
+            sim_time = self.get_simulation_time()
+            if sim_time is None:
+                return
+
+            # Run the simulation
+            run_bdsim_simulation(blocks, wires, T=sim_time)
+
+        except Exception as e:
+            self.show_error_message(str(e))
 
     def validate_blocks_and_wires(self, blocks, wires):
         """Validate blocks and wires before simulation."""
@@ -126,44 +189,25 @@ class MainWindow(QMainWindow):
 
         return True
 
-    def simulate(self):
-        """Run the simulation using bdsim."""
-        blocks, wires = self.canvas.get_blocks_and_wires()
-
+    def get_simulation_time(self):
+        """Retrieve and validate the simulation time."""
         try:
-            # Validate blocks and wires before simulation
-            if not self.validate_blocks_and_wires(blocks, wires):
-                return
-
-            # Get simulation time
-            try:
-                sim_time = float(self.sim_time_input.text())
-                if sim_time <= 0:
-                    raise ValueError("Simulation time must be greater than zero.")
-            except ValueError as e:
-                self.show_error_message(f"Invalid simulation time: {e}")
-                return
-
-            # Run simulation with updated logic
-            run_bdsim_simulation(blocks, wires, T=sim_time)
-
-        except Exception as e:
-            self.show_error_message(str(e))
+            sim_time = float(self.sim_time_input.text())
+            if sim_time <= 0:
+                raise ValueError("Simulation time must be greater than zero.")
+            return sim_time
+        except ValueError as e:
+            self.show_error_message(f"Invalid simulation time: {e}")
+            return None
 
     def save_to_file(self):
         """Save the current block diagram to a file."""
         blocks, wires = self.canvas.get_blocks_and_wires()
+        diagram_data = {"blocks": blocks, "wires": wires}
 
-        # Serialize the block diagram
-        diagram_data = {
-            "blocks": blocks,
-            "wires": wires
-        }
-
-        # Open a save dialog
-        options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getSaveFileName(self, "Save Diagram", "", "JSON Files (*.json);;All Files (*)",
-                                                   options=options)
+        file_name, _ = QFileDialog.getSaveFileName(
+            self, "Save Diagram", "", "JSON Files (*.json);;All Files (*)"
+        )
 
         if file_name:
             try:
@@ -174,19 +218,15 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Failed to save file: {e}")
 
     def load_from_file(self):
-        """Load a block diagram from a file using DiagramCanvas's load_from_file."""
-        options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getOpenFileName(self, "Load Diagram", "", "JSON Files (*.json);;All Files (*)",
-                                                   options=options)
+        """Load a block diagram from a file."""
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "Load Diagram", "", "JSON Files (*.json);;All Files (*)"
+        )
 
         if file_name:
             try:
-                # Reset the block naming counter and clear the canvas
                 Block.reset_instance_counter()
-
-                # Call the load_from_file method from DiagramCanvas
                 self.canvas.load_from_file(file_name)
-
                 QMessageBox.information(self, "Success", f"Diagram loaded from {file_name}")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load file: {e}")

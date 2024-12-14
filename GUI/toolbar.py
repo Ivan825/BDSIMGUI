@@ -1,42 +1,52 @@
-from PyQt5.QtWidgets import QToolBar, QAction, QComboBox, QLabel
+from PyQt5.QtWidgets import QToolBar, QAction, QComboBox, QLabel,QMenu
 from PyQt5.QtGui import QIcon
 
 class Toolbar(QToolBar):
     def __init__(self):
-        super().__init__()
-        self.canvas = None
-        self.plot_canvas = None
+        def __init__(self):
+            super().__init__()
+            self.canvas = None
 
-        # Add Block Type Selector
-        self.block_type_label = QLabel("Block Type:")
-        self.block_type_selector = QComboBox()
-        self.block_type_selector.addItems(["STEP", "GAIN", "SUM", "SCOPE", "RAMP", "WAVEFORM", "CONSTANT", "LTI"])
-        self.addWidget(self.block_type_label)
-        self.addWidget(self.block_type_selector)
+            # File Operations
+            file_menu = QMenu("File Operations", self)
+            save_action = QAction("Save Diagram", self)
+            save_action.triggered.connect(self.save_to_file)
+            load_action = QAction("Load Diagram", self)
+            load_action.triggered.connect(self.load_from_file)
+            file_menu.addAction(save_action)
+            file_menu.addAction(load_action)
+            self.addAction(file_menu.menuAction())
 
-        # Add Block Action
-        self.add_block_action = QAction(QIcon(None), "Add Block", self)
-        self.add_block_action.triggered.connect(self.add_block)
-        self.addAction(self.add_block_action)
+            # Edit Operations
+            edit_menu = QMenu("Edit Operations", self)
+            undo_action = QAction("Undo", self)
+            undo_action.triggered.connect(self.undo)
+            redo_action = QAction("Redo", self)
+            redo_action.triggered.connect(self.redo)
+            delete_action = QAction("Delete Selected", self)
+            delete_action.triggered.connect(self.delete_selected)
+            edit_menu.addAction(undo_action)
+            edit_menu.addAction(redo_action)
+            edit_menu.addAction(delete_action)
+            self.addAction(edit_menu.menuAction())
 
-        # Run Simulation Action
-        self.run_simulation_action = QAction(QIcon(None), "Run Simulation", self)
-        self.run_simulation_action.triggered.connect(self.run_simulation)
-        self.addAction(self.run_simulation_action)
+            # Block Options
+            block_label = QLabel("Block Type:")
+            self.addWidget(block_label)
+            self.block_type_selector = QComboBox()
+            self.block_type_selector.addItems(["STEP", "GAIN", "SUM", "SCOPE", "RAMP", "WAVEFORM", "CONSTANT", "LTI"])
+            self.addWidget(self.block_type_selector)
 
-        # Toolbar for Save and Load
-        save_action = QAction("Save Diagram", self)
-        save_action.triggered.connect(self.save_to_file)
-        self.toolbar.addAction(save_action)
+            add_block_action = QAction("Add Block", self)
+            add_block_action.triggered.connect(self.add_block)
+            self.addAction(add_block_action)
 
-        # New Diagram
-        new_diagram_action = QAction("New Diagram", self)
-        new_diagram_action.triggered.connect(self.new_diagram)
-        self.toolbar.addAction(new_diagram_action)
-
-        load_action = QAction("Load Diagram", self)
-        load_action.triggered.connect(self.load_from_file)
-        self.toolbar.addAction(load_action)
+            # Simulation Controls
+            simulation_menu = QMenu("Simulation Controls", self)
+            run_simulation_action = QAction("Run Simulation", self)
+            run_simulation_action.triggered.connect(self.run_simulation)
+            simulation_menu.addAction(run_simulation_action)
+            self.addAction(simulation_menu.menuAction())
 
     def set_canvas(self, canvas):
         """Connect the toolbar to the diagram canvas."""
@@ -51,7 +61,13 @@ class Toolbar(QToolBar):
         if self.canvas:
             block_type = self.block_type_selector.currentText()
             print(f"Adding block: {block_type}")
-            self.canvas.add_block(block_type, 100, 100)
+            # Call add_block without fixed coordinates to let the canvas logic handle placement
+            self.canvas.add_block(block_type)
+
+    def set_canvas(self, canvas):
+        """Connect the toolbar to the diagram canvas."""
+        self.canvas = canvas
+        print("Toolbar connected to canvas.")  # Debugging output
 
     def run_simulation(self):
         """Run the simulation and display results."""

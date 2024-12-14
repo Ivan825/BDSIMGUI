@@ -1,6 +1,6 @@
 from PyQt5.QtGui import QPen, QColor, QFont
-from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsItem, QGraphicsTextItem, QGraphicsLineItem
-from PyQt5.QtCore import Qt, QPointF, QLineF
+from PyQt5.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsItem, QGraphicsTextItem
+from PyQt5.QtCore import Qt, QPointF
 import logging
 
 # Set up logging
@@ -10,8 +10,9 @@ logging.basicConfig(level=logging.ERROR, format="%(asctime)s - %(levelname)s - %
 class Block(QGraphicsRectItem):
     """A draggable block with connection ports and editable properties."""
     instance_counter = {}  # Keeps track of instance numbers per block type
+    GRID_SIZE = 20  # Grid size for snap-to-grid functionality
 
-    def __init__(self, block_type, width=100, height=50, properties=None,name=None):
+    def __init__(self, block_type, width=100, height=50, properties=None, name=None):
         super().__init__(0, 0, float(width), float(height))
         self.setBrush(Qt.lightGray)
         self.setFlags(
@@ -43,10 +44,47 @@ class Block(QGraphicsRectItem):
         self.output_ports = []
         self.add_ports()
 
+        # Dynamic block color based on block type
+        self.set_block_color()
+
     @classmethod
     def reset_instance_counter(cls):
         """Reset the instance counter for blocks."""
         cls.instance_counter = {}
+
+    def set_block_color(self):
+        """Set block color based on its type."""
+        color_map = {
+            "STEP": QColor(200, 200, 255),
+            "GAIN": QColor(200, 255, 200),
+            "SUM": QColor(255, 200, 200),
+            "SCOPE": QColor(255, 255, 200),
+            "RAMP": QColor(200, 255, 255),
+            "WAVEFORM": QColor(255, 200, 255),
+            "CONSTANT": QColor(240, 240, 240),
+            "LTI": QColor(255, 220, 180),
+        }
+        self.setBrush(color_map.get(self.block_type, Qt.lightGray))
+
+    def snap_to_grid(self, pos):
+        """Snap the block position to the nearest grid point."""
+        x = round(pos.x() / Block.GRID_SIZE) * Block.GRID_SIZE
+        y = round(pos.y() / Block.GRID_SIZE) * Block.GRID_SIZE
+        return QPointF(x, y)
+
+    def itemChange(self, change, value):
+        """Update ports when block is moved."""
+        if change == QGraphicsItem.ItemPositionChange:
+            try:
+                # Snap to grid
+                new_pos = self.snap_to_grid(value)
+                for port in self.input_ports + self.output_ports:
+                    if port:  # Check if port is valid
+                        port.notify_wires()
+                return new_pos
+            except Exception as e:
+                logging.error(f"Error updating port wires: {e}")
+        return super().itemChange(change, value)
 
     def create_bdsim_instance(self, bdsim_model):
         """Create a bdsim block instance for this block."""
@@ -162,17 +200,6 @@ class Block(QGraphicsRectItem):
         for port in self.input_ports + self.output_ports:
             port.remove_connected_wires()
 
-    def itemChange(self, change, value):
-        """Update ports when block is moved."""
-        if change == QGraphicsItem.ItemPositionChange:
-            try:
-                for port in self.input_ports + self.output_ports:
-                    if port:  # Check if port is valid
-                        port.notify_wires()
-            except Exception as e:
-                print(f"Error updating port wires: {e}")
-        return super().itemChange(change, value)
-
 
 class Port(QGraphicsEllipseItem):
     def __init__(self, parent, port_type, radius=5):
@@ -203,6 +230,3 @@ class Port(QGraphicsEllipseItem):
             self.remove_connected_wires()  # Remove wires directly connected to this port
         except Exception as e:
             logging.error(f"Error during port deletion: {e}")
-
-
-
