@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene
+from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem
 from PyQt5.QtCore import Qt
 from GUI.blocks import Block, Port
 from GUI.wires import Wire
@@ -6,6 +6,7 @@ from PyQt5.QtGui import QPainter
 import json
 from PyQt5.QtGui import QPen, QColor
 from PyQt5.QtCore import QRectF
+from PyQt5.QtWidgets import QGraphicsItemGroup
 
 
 class DiagramCanvas(QGraphicsView):
@@ -32,6 +33,7 @@ class DiagramCanvas(QGraphicsView):
         # Undo/Redo stacks
         self.undo_stack = []
         self.redo_stack = []
+        self.current_group = None  # Store the current active group
 
     def get_blocks_and_wires(self):
         """Retrieve all blocks and wires from the canvas for simulation or saving."""
@@ -163,6 +165,58 @@ class DiagramCanvas(QGraphicsView):
 
         self.redo_stack.clear()  # Clear Redo stack
 
+    def group_selected_items(self):
+        """Group selected items into a QGraphicsItemGroup."""
+        selected_items = self.scene.selectedItems()
+
+        if not selected_items:
+            print("No items selected for grouping.")
+            return
+
+        group = QGraphicsItemGroup()
+
+        for item in selected_items:
+            group.addToGroup(item)
+            item.setSelected(False)  # Deselect items
+
+        group.setFlag(QGraphicsItem.ItemIsMovable, True)
+        group.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.scene.addItem(group)
+
+        # Add the group to the undo stack
+        self.undo_stack.append(("group", group, selected_items))
+        print("Grouped items successfully.")
+
+    def ungroup_selected_items(self):
+        """Ungroup selected QGraphicsItemGroup and ensure wires remain visually connected."""
+        selected_items = self.scene.selectedItems()
+
+        for group in selected_items:
+            if isinstance(group, QGraphicsItemGroup):
+                items_in_group = group.childItems()
+
+                # Remove items from group and reset their positions
+                for item in items_in_group:
+                    group.removeFromGroup(item)
+                    item.setSelected(True)
+
+                    if isinstance(item, Wire):
+                        item.update_position()  # Refresh wire endpoints visually
+
+                self.scene.removeItem(group)  # Remove the group container
+
+                # Reconnect wires and update their visual positions
+                for item in items_in_group:
+                    if isinstance(item, Block):
+                        for port in item.input_ports + item.output_ports:
+                            for wire in port.connected_wires:
+                                wire.update_position()
+
+                # Add to undo stack
+                self.undo_stack.append(("ungroup", group, items_in_group))
+                self.redo_stack.clear()
+                print("Ungrouped items successfully.")
+
     def save_to_file(self, file_path):
         """Save the current diagram to a file."""
         blocks, wires = self.get_blocks_and_wires()
@@ -272,58 +326,62 @@ class DiagramCanvas(QGraphicsView):
         if not self.undo_stack:
             return
 
-        action, obj = self.undo_stack.pop()
-
-        if action == "add_block":
-            self.scene.removeItem(obj)
-            self.redo_stack.append(("add_block", obj))
-        elif action == "add_wire":
-            self.scene.removeItem(obj)
-            self.redo_stack.append(("add_wire", obj))
+        action, *args = self.undo_stack.pop()
+        if action == "group":
+            group, items = args
+            self.scene.removeItem(group)
+            for item in items:
+                item.setSelected(True)
+        elif action == "ungroup":
+            group, items = args
+            self.scene.addItem(group)
+            for item in items:
+                group.addToGroup(item)
+        elif action == "add_block":
+            self.scene.removeItem(args[0])
         elif action == "delete_block":
-            self.scene.addItem(obj)
-            self.redo_stack.append(("delete_block", obj))
+            self.scene.addItem(args[0])
+        elif action == "add_wire":
+            self.scene.removeItem(args[0])
         elif action == "delete_wire":
-            # Re-add the deleted wire
-            wire_data = obj
+            wire_data = args[0]
             new_wire = Wire(wire_data["start_port"], wire_data["end_port"])
             self.scene.addItem(new_wire)
-            self.redo_stack.append(("delete_wire", wire_data))
         elif action == "clear":
-            # Recreate all blocks and wires
-            for block_data in obj[0]:
+            blocks, wires = args[0]
+            for block_data in blocks:
                 self.add_block(block_data["type"], block_data["x"], block_data["y"], block_data["name"])
-            for wire_data in obj[1]:
-                self.add_wire(
-                    wire_data["start"],
-                    wire_data["start_port_index"],
-                    wire_data["end"],
-                    wire_data["end_port_index"],
-                )
-            self.redo_stack.append(("clear", self.get_blocks_and_wires()))
+            for wire_data in wires:
+                self.add_wire(wire_data["start"], wire_data["start_port_index"],
+                              wire_data["end"], wire_data["end_port_index"])
+
+        self.redo_stack.append((action, *args))
 
     def redo_action(self):
         """Redo the last undone action."""
         if not self.redo_stack:
             return
 
-        action, obj = self.redo_stack.pop()
-
-        if action == "add_block":
-            self.scene.addItem(obj)
-            self.undo_stack.append(("add_block", obj))
-        elif action == "add_wire":
-            self.scene.addItem(obj)
-            self.undo_stack.append(("add_wire", obj))
+        action, *args = self.redo_stack.pop()
+        if action == "group":
+            group, items = args
+            self.scene.addItem(group)
+            for item in items:
+                group.addToGroup(item)
+        elif action == "ungroup":
+            group, items = args
+            self.scene.removeItem(group)
+            for item in items:
+                item.setSelected(True)
+        elif action == "add_block":
+            self.scene.addItem(args[0])
         elif action == "delete_block":
-            self.scene.removeItem(obj)
-            self.undo_stack.append(("delete_block", obj))
+            self.scene.removeItem(args[0])
+        elif action == "add_wire":
+            self.scene.addItem(args[0])
         elif action == "delete_wire":
-            # Remove the wire again
-            wire_data = obj
-            self.scene.removeItem(wire_data["wire"])
-            self.undo_stack.append(("delete_wire", wire_data))
+            self.scene.removeItem(args[0]["wire"])
         elif action == "clear":
-            for item in self.scene.items():
-                self.scene.removeItem(item)
-            self.undo_stack.append(("clear", self.get_blocks_and_wires()))
+            self.clear()
+
+        self.undo_stack.append((action, *args))

@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QWidget, QSplitter, QToolBar,
-    QComboBox, QLabel, QAction, QLineEdit, QMessageBox, QFileDialog
+    QComboBox, QLabel, QAction, QLineEdit, QMessageBox, QFileDialog, QHBoxLayout
 )
 from PyQt5.QtCore import Qt
 import json
@@ -54,16 +54,17 @@ class MainWindow(QMainWindow):
 
     def setup_toolbars(self):
         """Setup toolbars with grouped actions split into two rows."""
-        # First toolbar for Block Operations
+        # First Toolbar: Block Operations and Edit Operations
         self.block_toolbar = QToolBar("Block Operations")
         self.addToolBar(Qt.TopToolBarArea, self.block_toolbar)
 
-        self.block_type_label = QLabel("Block Type:")
+        # Block Operations
+        block_label = QLabel("Block Type:")
+        self.block_toolbar.addWidget(block_label)
+
         self.block_type_selector = QComboBox()
         self.block_type_selector.addItems(["STEP", "GAIN", "SUM", "SCOPE", "RAMP", "WAVEFORM", "CONSTANT", "LTI"])
         self.block_type_selector.currentTextChanged.connect(self.set_block_type)
-
-        self.block_toolbar.addWidget(self.block_type_label)
         self.block_toolbar.addWidget(self.block_type_selector)
 
         add_block_action = QAction("Add Block", self)
@@ -74,14 +75,20 @@ class MainWindow(QMainWindow):
         delete_action.triggered.connect(self.delete_selected)
         self.block_toolbar.addAction(delete_action)
 
-        # Second toolbar for File, Simulation, and Edit actions
+        # Group and Ungroup Buttons
+        group_action = QAction("Group", self)
+        group_action.triggered.connect(self.group_selected_items)
+        self.block_toolbar.addAction(group_action)
+
+        ungroup_action = QAction("Ungroup", self)
+        ungroup_action.triggered.connect(self.ungroup_selected_items)
+        self.block_toolbar.addAction(ungroup_action)
+
+        # Second Toolbar: File and Simulation Operations
         self.main_toolbar = QToolBar("Main Operations")
         self.addToolBar(Qt.TopToolBarArea, self.main_toolbar)
 
         # File Actions
-        file_group_label = QLabel("File Operations:")
-        self.main_toolbar.addWidget(file_group_label)
-
         save_action = QAction("Save Diagram", self)
         save_action.triggered.connect(self.save_to_file)
         self.main_toolbar.addAction(save_action)
@@ -95,12 +102,10 @@ class MainWindow(QMainWindow):
         self.main_toolbar.addAction(new_diagram_action)
 
         # Simulation Actions
-        simulation_group_label = QLabel("Simulation:")
-        self.main_toolbar.addWidget(simulation_group_label)
-
         self.sim_time_label = QLabel("Simulation Time:")
-        self.sim_time_input = QLineEdit("5")  # Default value is 5 seconds
         self.main_toolbar.addWidget(self.sim_time_label)
+
+        self.sim_time_input = QLineEdit("5")
         self.main_toolbar.addWidget(self.sim_time_input)
 
         simulate_action = QAction("Simulate", self)
@@ -108,9 +113,6 @@ class MainWindow(QMainWindow):
         self.main_toolbar.addAction(simulate_action)
 
         # Undo/Redo Actions
-        undo_redo_group_label = QLabel("Edit:")
-        self.main_toolbar.addWidget(undo_redo_group_label)
-
         undo_action = QAction("Undo", self)
         undo_action.triggered.connect(self.undo_action)
         self.main_toolbar.addAction(undo_action)
@@ -143,6 +145,14 @@ class MainWindow(QMainWindow):
         """Delete all selected items (blocks, wires, or groups)."""
         self.canvas.delete_selected()
 
+    def group_selected_items(self):
+        """Group selected items."""
+        self.canvas.group_selected_items()
+
+    def ungroup_selected_items(self):
+        """Ungroup selected items."""
+        self.canvas.ungroup_selected_items()
+
     def undo_action(self):
         """Perform undo action."""
         self.canvas.undo_action()
@@ -172,13 +182,11 @@ class MainWindow(QMainWindow):
 
     def validate_blocks_and_wires(self, blocks, wires):
         """Validate blocks and wires before simulation."""
-        # Ensure there is at least one SCOPE block
         scope_present = any(block["type"] == "SCOPE" for block in blocks)
         if not scope_present:
             self.show_error_message("Simulation Error: No SCOPE block present.")
             return False
 
-        # Ensure all wires connect valid blocks
         block_names = {block["name"] for block in blocks}
         for wire in wires:
             if wire["start"] not in block_names or wire["end"] not in block_names:
