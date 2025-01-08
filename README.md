@@ -19,3 +19,6 @@
     pip install -r requirements.txt
 
 ```
+GUI:
+
+![image](https://github.com/user-attachments/assets/47012ba5-200d-4a77-a83a-e54ca32e8092)
